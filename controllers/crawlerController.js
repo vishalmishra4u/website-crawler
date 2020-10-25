@@ -79,6 +79,30 @@ class concurrentWorker{
 
 }
 
+getParsedUrls = async (req,res)=>{
+    try {
+        let parsedUrls = await ParsedUrls.find({});
+        if(parsedUrls && parsedUrls.length>0){
+            res.send({
+                success: true,
+                NoOfUniqueUrls: parsedUrls.length || 0,
+                parsedUrls: parsedUrls
+            });
+        }else{
+            res.send({
+                success: true,
+                parsedUrls: 'No urls have been parsed Yet!!'
+            });
+        }
+
+    } catch (error) {
+        res.send({
+            success:false,
+            msg:error
+        });
+    }
+}
+
 // function to Save the parsed Urls to Database.
 function storeUrlsToDB(urlsArray) {
 
