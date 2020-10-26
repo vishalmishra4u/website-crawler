@@ -2,7 +2,8 @@ const cheerio = require('cheerio'),
     request = require('request'),
     fs = require('fs');
 
-const storeUrlsService = require('../services/storeUrlsToDB');
+const storeUrlsService = require('../services/storeUrlsToDB'),
+  ParsedUrls = require('../dao/crawlerDAO');
 
 let websites = ['https://medium.com'];
 
