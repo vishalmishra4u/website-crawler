@@ -2,6 +2,8 @@ const cheerio = require('cheerio'),
     request = require('request'),
     fs = require('fs');
 
+const storeUrlsService = require('../services/storeUrlsToDB');
+
 let websites = ['https://medium.com'];
 
 function scrapeSite(url) {
@@ -26,7 +28,7 @@ function scrapeSite(url) {
 
 class concurrentWorker{
 
-  constructor(urls = [], concurrentCounter = 5){
+  constructor(urls = [], concurrentCounter = 1){
     this.concurrent = concurrentCounter - 1;
     this.running = [];
     this.todoUrls = urls;
@@ -35,7 +37,7 @@ class concurrentWorker{
   }
 
   get runAnotherThread(){
-    return (this.running.length < this.concurrent && this.todoUrls);
+    return (this.running.length < this.concurrent && this.todoUrls.length);
   }
 
   checkUrlValidity(url) {
@@ -48,9 +50,9 @@ class concurrentWorker{
   }
 
   checkMediumUrl(url) {
-      let mediumUrl = 'medium.com';
-      let pattern = new RegExp(url);
-      return pattern.test(url);
+    let pattern = 'medium.com';
+    pattern = new RegExp(pattern);
+    return pattern.test(url);
   }
 
   removeDuplicateUrls(taskUrls, scrapedUrlsObject, callback) {
@@ -58,7 +60,7 @@ class concurrentWorker{
           let updatedUrls = []
           updatedUrls = taskUrls.filter(url => {
               let u = url;
-              if (scrapedUrlsObject[u] != true && this.checkIfUrlIsValid(url)) { return true; }
+              if (scrapedUrlsObject[u] != true && this.checkUrlValidity(url)) { return true; }
               return false;
           })
           resolve(updatedUrls);
@@ -70,37 +72,35 @@ class concurrentWorker{
       let url = this.todoUrls.shift();
 
       if(!this.scrapedUrls[url] && this.checkUrlValidity(url) && this.checkMediumUrl(url)){
-        // process.exit();
         this.scrapedUrls[url] = true;
 
         scrapeSite(url)
           .then((taskUrls) => {
 
-            process.exit();
             if (taskUrls.length > 0) {
                 this.removeDuplicateUrls(taskUrls, this.scrapedUrls).then(uniqueUrls => {
-                    this.todo = [...this.todoUrls, ...uniqueUrls]
+                    this.todoUrls = [...this.todoUrls, ...uniqueUrls]
                     this.complete.push(this.running.shift());
 
                     // If schedule queue is empty or completed task has reached to 50 Save them to DB.
-                    if (this.todo.length == 0 || this.complete.length == 50) {
+                    if (this.todoUrls.length == 0 || this.complete.length == 50) {
                         storeUrlsToDB(this.complete)
                         this.complete.length = 0;
                     }
-                    this.recursiveSolution(); //call recursive function for another url to crawl.
+                    this.scrapeUrls(); //call recursive function for another url to crawl.
                 }).catch(err => {
                     storeUrlsToDB(this.complete);
-                })
+                });
 
             } else {
-                this.todo = [...this.todo, ...taskUrls];
+                this.todoUrls = [...this.todoUrls, ...taskUrls];
                 this.complete.push(this.running.shift()); // Push to the complete array.
 
-                if (this.todo.length == 0 || this.complete.length == 50) {
+                if (this.todoUrls.length == 0 || this.complete.length == 50) {
                     storeUrlsToDB(this.complete)
                     this.complete.length = 0;
                 }
-                this.recursiveSolution(); // Calling Resursive Function.
+                this.scrapeUrls(); // Calling Resursive Function.
             }
           })
           .catch(err => {
@@ -117,7 +117,7 @@ class concurrentWorker{
   }
 }
 
-var startCrawling = new concurrentWorker(websites, 1);
+var startCrawling = new concurrentWorker(websites, 5);
 
 getParsedUrls = async (req,res)=>{
     try {
@@ -145,7 +145,7 @@ getParsedUrls = async (req,res)=>{
 
 // function to Save the parsed Urls to Database.
 function storeUrlsToDB(urlsArray) {
-  storeUrlsToDB.storeUrls(urlsArray);
+  storeUrlsService.storeUrls(urlsArray);
 }
 
 function startCrawler(req, res) {

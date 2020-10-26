@@ -22,6 +22,7 @@ const parseUrls = util.promisify(getUrlData);
 // Database Operations
 
 storeUrls = async (urlsArray)=>{
+  console.log("Coming here---",urlsArray);
     parseUrls(urlsArray)
       .then(async modifiedUrlArray => {
         for (let i = 0; i < modifiedUrlArray.length; i++) {
