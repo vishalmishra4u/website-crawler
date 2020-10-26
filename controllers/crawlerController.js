@@ -148,6 +148,8 @@ function storeUrlsToDB(urlsArray) {
 function startCrawler(req, res) {
     startCrawling.scrapeUrls();
     res.json({
-        msg: 'Scraping initiated. To get the scraped URLs, try this route ::'
+        msg: 'Scraping initiated. To get the scraped URLs, try this route ::getParsedUrls'
     });
 }
+
+module.exports = {startCrawler, getParsedUrls};
