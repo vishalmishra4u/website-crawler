@@ -6,7 +6,7 @@ const app = express();
 let properties = require('./config/properties');
 
 //Importing crawler route
-const crawlerRoutes = require('./src/route/crawlerRoutes');
+const crawlerRoutes = require('./route/crawlerRoutes');
 
 db();
 

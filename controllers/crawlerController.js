@@ -38,7 +38,7 @@ class concurrentWorker{
     return (this.running.length < this.concurrent && this.todoUrls);
   }
 
-  function checkUrlValidity(url) {
+  checkUrlValidity(url) {
       const urlPattern = new RegExp('^(https?:\\/\\/)?' +
           '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,})' +
           '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' +
@@ -47,35 +47,38 @@ class concurrentWorker{
       return urlPattern.test(url);
   }
 
-  function checkMediumUrl(url) {
+  checkMediumUrl(url) {
       let mediumUrl = 'medium.com';
-      pattern = new RegExp(url);
+      let pattern = new RegExp(url);
       return pattern.test(url);
   }
 
-  removeDuplicateUrls(taskUrls, completedUrlsObject, callback) {
+  removeDuplicateUrls(taskUrls, scrapedUrlsObject, callback) {
       return new Promise(async (resolve, reject) => {
           let updatedUrls = []
           updatedUrls = taskUrls.filter(url => {
               let u = url;
-              if (completedUrlsObject[u] != true && this.checkIfUrlIsValid(url)) { return true; }
+              if (scrapedUrlsObject[u] != true && this.checkIfUrlIsValid(url)) { return true; }
               return false;
           })
           resolve(updatedUrls);
-      })
+      });
   }
 
-  function scrapeUrls(){
+  scrapeUrls(){
     while(this.runAnotherThread){
       let url = this.todoUrls.shift();
 
-      if(!this.completedUrls && this.checkUrlValidity(url) && this.checkMediumUrl(url)){
-        this.completedUrls[url] = true;
+      if(!this.scrapedUrls[url] && this.checkUrlValidity(url) && this.checkMediumUrl(url)){
+        // process.exit();
+        this.scrapedUrls[url] = true;
 
         scrapeSite(url)
           .then((taskUrls) => {
+
+            process.exit();
             if (taskUrls.length > 0) {
-                this.removeDuplicateUrls(taskUrls, this.completedUrls).then(uniqueUrls => {
+                this.removeDuplicateUrls(taskUrls, this.scrapedUrls).then(uniqueUrls => {
                     this.todo = [...this.todoUrls, ...uniqueUrls]
                     this.complete.push(this.running.shift());
 
@@ -114,7 +117,7 @@ class concurrentWorker{
   }
 }
 
-var startCrawling = new concurrentWorker(websites, 5);
+var startCrawling = new concurrentWorker(websites, 1);
 
 getParsedUrls = async (req,res)=>{
     try {
@@ -146,6 +149,7 @@ function storeUrlsToDB(urlsArray) {
 }
 
 function startCrawler(req, res) {
+  console.log("API called");
     startCrawling.scrapeUrls();
     res.json({
         msg: 'Scraping initiated. To get the scraped URLs, try this route ::getParsedUrls'
