@@ -2,7 +2,7 @@ const cheerio = require('cheerio'),
     request = require('request'),
     fs = require('fs');
 
-let website = ['https://medium.com'];
+let websites = ['https://medium.com'];
 
 function scrapeSite(url) {
     return new Promise((resolve, reject) => {
@@ -53,6 +53,18 @@ class concurrentWorker{
       return pattern.test(url);
   }
 
+  removeDuplicateUrls(taskUrls, completedUrlsObject, callback) {
+      return new Promise(async (resolve, reject) => {
+          let updatedUrls = []
+          updatedUrls = taskUrls.filter(url => {
+              let u = url;
+              if (completedUrlsObject[u] != true && this.checkIfUrlIsValid(url)) { return true; }
+              return false;
+          })
+          resolve(updatedUrls);
+      })
+  }
+
   function scrapeUrls(){
     while(this.runAnotherThread){
       let url = this.todoUrls.shift();
@@ -61,8 +73,32 @@ class concurrentWorker{
         this.completedUrls[url] = true;
 
         scrapeSite(url)
-          .then(() => {
+          .then((taskUrls) => {
+            if (taskUrls.length > 0) {
+                this.removeDuplicateUrls(taskUrls, this.completedUrls).then(uniqueUrls => {
+                    this.todo = [...this.todoUrls, ...uniqueUrls]
+                    this.complete.push(this.running.shift());
 
+                    // If schedule queue is empty or completed task has reached to 50 Save them to DB.
+                    if (this.todo.length == 0 || this.complete.length == 50) {
+                        storeUrlsToDB(this.complete)
+                        this.complete.length = 0;
+                    }
+                    this.recursiveSolution(); //call recursive function for another url to crawl.
+                }).catch(err => {
+                    storeUrlsToDB(this.complete);
+                })
+
+            } else {
+                this.todo = [...this.todo, ...taskUrls];
+                this.complete.push(this.running.shift()); // Push to the complete array.
+
+                if (this.todo.length == 0 || this.complete.length == 50) {
+                    storeUrlsToDB(this.complete)
+                    this.complete.length = 0;
+                }
+                this.recursiveSolution(); // Calling Resursive Function.
+            }
           })
           .catch(err => {
             console.log("Error in scraping Url ::", err);
@@ -71,13 +107,14 @@ class concurrentWorker{
 
             storeUrlsToDB(this.complete);
           });
+
+          this.running.push(url);
       }
-
-
     }
   }
-
 }
+
+var startCrawling = new concurrentWorker(websites, 5);
 
 getParsedUrls = async (req,res)=>{
     try {
@@ -105,5 +142,12 @@ getParsedUrls = async (req,res)=>{
 
 // function to Save the parsed Urls to Database.
 function storeUrlsToDB(urlsArray) {
+  storeUrlsToDB.storeUrls(urlsArray);
+}
 
+function startCrawler(req, res) {
+    startCrawling.scrapeUrls();
+    res.json({
+        msg: 'Scraping initiated. To get the scraped URLs, try this route ::'
+    });
 }
